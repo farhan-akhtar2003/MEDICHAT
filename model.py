@@ -1,3 +1,4 @@
+# Import necessary libraries
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
@@ -7,61 +8,124 @@ from langchain.memory import ConversationBufferWindowMemory
 from langchain.chains import ConversationalRetrievalChain
 import streamlit as st
 import time
-st.set_page_config(page_title="LawGPT")
-col1, col2, col3 = st.columns([1,4,1])
-with col2:
-   
-    st.image("Black Bold Initial AI Business Logo.jpg")
+from dotenv import load_dotenv # load specific environment that been created
+ 
+load_dotenv()
+## Langsmith project tracking
+os.environ["LANGCHAIN_TRACING_V2"]="true"
+os.environ["LANGCHAIN_API_KEY"]=os.getenv("LANGCHAIN_API_KEY")
 
+# Set up the Streamlit page configuration
+st.set_page_config(page_title="MedGPT", layout="wide")
 
+# Custom CSS for styling the app
 st.markdown(
     """
-     <style>
-    .stApp, .ea3mdgi6{
-      background-color:#000000;
+    <style>
+    /* Main container for flexbox layout */
+    .main {
+        display: flex;
     }
-  div.stButton > button:first-child {
-    background-color: #ffd0d0;
-}
-div.stButton > button:active {
-    # background-color: #ff6262;
-}
-   div[data-testid="stStatusWidget"] div button {
-        display: none;
-        }
     
-    .reportview-container {
-            margin-top: -2em;
-        }
-        #MainMenu {visibility: hidden;}
-        .stDeployButton {display:none;}
-        footer {visibility: hidden;}
-        #stDecoration {display:none;}
-    button[title="View fullscreen"]{
-    visibility: hidden;}
-    button:first-child{
-    background-color : transparent !important;
+    /* Sidebar styling */
+    .sidebar {
+        width: 300px;
+        padding: 20px;
+        height: 100vh;
+        position: fixed;
+        background-color: #000000;
+        left: 0;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
-  </style>
-""",
-  unsafe_allow_html=True,
+    
+    /* Main chat container styling */
+    .chat-container {
+        flex: 1;
+        padding: 20px;
+        margin-left: 300px;
+    }
+    
+    .stApp, .ea3mdgi6 {
+        background-color: #000000; /* right side bg color */
+    }
+    
+    div.stButton > button:first-child {
+        background-color: #ffd0d0;
+    }
+    div.stButton > button:active {
+        background-color: #ff6262;
+    }
+    
+    div[data-testid="stStatusWidget"] div button {
+        display: none;
+    }
+    
+    /* Adjust top margin of the report view container */
+    .reportview-container {
+        margin-top: -2em;
+    }
+    
+    /* Hide various Streamlit elements */
+    #MainMenu {visibility: hidden;}
+    .stDeployButton {display:none;}
+    footer {visibility: hidden;}
+    #stDecoration {display:none;}
+    button[title="View fullscreen"]{
+        visibility: hidden;
+    }
+    
+    /* Ensure the placeholder text is also visible */
+    .stTextInput > div > div > input::placeholder {
+        color: #666666 !important;
+    }
+    
+    .stChatMessage {
+        background-color: #28282B; /* chat message background color set to black */
+        color : #000000 !important;
+    }
+
+
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
-def reset_conversation():
-  st.session_state.messages = []
-  st.session_state.memory.clear()
+# Create the sidebar
+with st.sidebar:
+    # Add logo to the sidebar
+    st.image("med-bot.jpg", width=200)
+    # Add title to the sidebar
+    st.title("MEDICHAT")
+    # Add description to the sidebar
+    st.markdown("Your AI MEDICAL ASSISTANT")
 
+# Main chat interface container
+st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+
+# Function to reset the conversation
+def reset_conversation():
+    st.session_state.messages = []
+    st.session_state.memory.clear()
+
+# Initialize session state for messages if not already present
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
+# Initialize conversation memory
 if "memory" not in st.session_state:
     st.session_state["memory"] = ConversationBufferWindowMemory(k=2, memory_key="chat_history",return_messages=True) 
 
+# Set up embeddings for vector search
 embedings = HuggingFaceEmbeddings(model_name="nomic-ai/nomic-embed-text-v1",model_kwargs={"trust_remote_code":True,"revision":"289f532e14dbbbd5a04753fa58739e9ba766f3c7"})
+# Load the FAISS vector database
 db = FAISS.load_local("./ipc_vector_db", embedings, allow_dangerous_deserialization=True)
 db_retriever = db.as_retriever(search_type="similarity",search_kwargs={"k": 4})
 
-prompt_template = """<s>[INST]This is a chat template and As a legal chat bot specializing in Indian Penal Code queries, your primary objective is to provide accurate and concise information based on the user's questions. Do not generate your own questions and answers. You will adhere strictly to the instructions provided, offering relevant context from the knowledge base while avoiding unnecessary details. Your responses will be brief, to the point, and in compliance with the established format. If a question falls outside the given context, you will refrain from utilizing the chat history and instead rely on your own knowledge base to generate an appropriate response. You will prioritize the user's query and refrain from posing additional questions. The aim is to deliver professional, precise, and contextually relevant information pertaining to the Indian Penal Code.
+# Define the prompt template for the AI
+prompt_template = """<s>[INST]You are a medical chatbot trained on the latest data in diagnosis and treatment, designed to provide accurate and concise information in response to users' medical queries. Your primary focus is to offer evidence-based answers related to symptoms, infections, disorders, diseases, and their respective treatments. Refrain from generating hypothetical diagnoses or questions, and stick strictly to the context provided. Ensure your responses are professional, concise, and relevant. If the question falls outside the given context, do not rely on chat history; instead, generate an appropriate response based on your medical knowledge. Prioritize the user's query, avoid unnecessary details, and ensure compliance with medical standards and guidelines.
 CONTEXT: {context}
 CHAT HISTORY: {chat_history}
 QUESTION: {question}
@@ -69,50 +133,63 @@ ANSWER:
 </s>[INST]
 """
 
+# Create a PromptTemplate object
 prompt = PromptTemplate(template=prompt_template,
                         input_variables=['context', 'question', 'chat_history'])
 
-
-
-
+# Set up the language model (LLM)
 llm = Together(
     model="mistralai/Mistral-7B-Instruct-v0.2",
     temperature=0.5,
     max_tokens=1024,
-    together_api_key="b68f2588587cb665eb94e89cff6ddafce235a0c570566909f9049fc4837d64be"
+    together_api_key="63796cfbe489810e7341f4622447cf023df92e6c6f9d665777f374032ba50474"
 )
 
+# Create the conversational retrieval chain
 qa = ConversationalRetrievalChain.from_llm(
     llm=llm,
     memory=ConversationBufferWindowMemory(k=2, memory_key="chat_history",return_messages=True),
     retriever=db_retriever,
     combine_docs_chain_kwargs={'prompt': prompt}
 )
+
+# Display previous messages
 for message in st.session_state.get("messages", []):
     with st.chat_message(message.get("role")):
         st.write(message.get("content"))
 
+# Create the chat input
+input_prompt = st.chat_input("Write your Queries here.....")#input text box for user to ask question
 
-input_prompt = st.chat_input("Say something")
-
+# Handle user input
 if input_prompt:
+    # Display user message
     with st.chat_message("user"):
         st.write(input_prompt)
 
+    # Add user message to session state
     st.session_state.messages.append({"role":"user","content":input_prompt})
 
+    # Generate and display AI response
     with st.chat_message("assistant"):
-        with st.status("Thinking 💡...",expanded=True):
+        with st.status("Introspecting 💡...",expanded=True):
+            # Invoke the QA chain to get the response
             result = qa.invoke(input=input_prompt)
 
             message_placeholder = st.empty()
 
-            full_response = "⚠️ **_Note: Information provided may be inaccurate._** \n\n\n"
+            full_response = "⚠️ **_Note: Information provided is accordance to current medical diagnosis & treatment 2023._** \n\n\n"
+        # Stream the response
         for chunk in result["answer"]:
             full_response+=chunk
             time.sleep(0.02)
             
             message_placeholder.markdown(full_response+" ▌")
+        # Add a button to reset the conversation
         st.button('Reset All Chat 🗑️', on_click=reset_conversation)
 
+    # Add AI response to session state
     st.session_state.messages.append({"role":"assistant","content":result["answer"]})
+
+# Close the chat container div
+st.markdown('</div>', unsafe_allow_html=True)

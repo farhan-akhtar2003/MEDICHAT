@@ -1,0 +1,45 @@
+What is RAG ?
+
+RAG is a technique for augmenting LLM knowledge with additional data.
+LLMs can reason about wide-ranging topics, but their knowledge is limited to the public data up to a specific point in time that they were trained on. If you want to build AI applications that can reason about private data or data introduced after a model’s cutoff date, you need to augment the knowledge of the model with the specific information it needs. The process of bringing the appropriate information and inserting it into the model prompt is known as Retrieval Augmented Generation (RAG).
+
+RAG Architecture
+
+A typical RAG application has two main components:
+
+Indexing: a pipeline for ingesting data from a source and indexing it. This usually happens offline.
+Retrieval and generation: The actual RAG chain, which takes the user query at run time and retrieves the relevant data from the index, then passes that to the model.
+
+
+Indexing:
+
+Load: First we need to load our data. This is done with DocumentLoaders.
+Split: Text splitters break large Documents into smaller chunks. This is useful both for indexing data and for passing it in to a model, since large chunks are harder to search over and won’t fit in a model’s finite context window.
+Store: We need somewhere to store and index our splits, so that they can later be searched over. This is often done using a VectorStore and Embeddings model.
+
+Retrieval and Generation
+
+Retrieve: Given a user input, relevant splits are retrieved from storage using a Retriever.
+Generate: A ChatModel / LLM produces an answer using a prompt that includes the question and the retrieved data.
+
+Chunking
+
+In this step I am creating the chunks of data, for this step I am using Recursive Character Splitter which break large Documents into smaller chunks. This is useful both for indexing data and for passing it in to a model, since large chunks are harder to search over and won’t fit in a model’s finite context window
+
+Embeddings Creation
+
+Embeddings creation is a crucial preprocessing step in the development of document-based Question and Answering (Q&A) systems. This process involves converting textual data from documents and questions into dense, high-dimensional vectors known as embeddings. These embeddings are designed to capture the semantic meaning of words, sentences, or even entire documents, enabling the Q&A system to understand and process natural language more effectively.
+
+Indexing
+
+Indexing data using Facebook AI Similarity Search (FAISS) is a pivotal step in developing efficient and scalable document-based Question and Answering (Q&A) systems. FAISS is a library that facilitates the efficient search for similarities in large datasets, especially useful for tasks involving high-dimensional vectors like text embeddings. When applied to document-based Q&A, FAISS indexes the embeddings of document chunks (e.g., paragraphs, sentences) to optimize the retrieval process.
+
+Retriever
+
+In the development of document-based Question and Answering (Q&A) systems, creating a retriever is a crucial step that directly impacts the system's ability to find relevant information efficiently. The retriever utilizes the pre-indexed embeddings of document chunks, searching through them to find the most relevant pieces of content in response to a user query. This process involves setting up a retrieval mechanism that leverages similarity search to identify the best matches for the query embeddings within the indexed data.
+
+LLM Models
+
+Large Language Models (LLMs) are advanced artificial intelligence systems designed to understand, generate, and interact with human language in a way that mimics human-like understanding. These models are trained on vast amounts of text data, allowing them to grasp the nuances of language, including grammar, context, and even cultural references. The capabilities of LLMs extend beyond simple text generation; they can perform a variety of tasks such as translation, summarization, question answering, and even code generation.
+One of the key technologies behind LLMs is the Transformer architecture, which enables the model to pay attention to different parts of the input text differently, thereby understanding the context and relationships between words and phrases more effectively. This architecture has led to significant improvements in natural language processing tasks and is the foundation of many state-of-the-art LLMs.
+
