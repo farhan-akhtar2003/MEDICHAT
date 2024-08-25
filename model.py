@@ -16,9 +16,8 @@ os.environ["LANGCHAIN_TRACING_V2"]="true"
 os.environ["LANGCHAIN_API_KEY"]=os.getenv("LANGCHAIN_API_KEY")
 
 # Set up the Streamlit page configuration
-st.set_page_config(page_title="MedGPT", layout="wide")
+st.set_page_config(page_title="MEDCHAT", layout="wide")
 
-# Custom CSS for styling the app
 st.markdown(
     """
     <style>
@@ -93,13 +92,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Create the sidebar
 with st.sidebar:
-    # Add logo to the sidebar
-    st.image("med-bot.jpg", width=200)
-    # Add title to the sidebar
+    st.image("med-bot.svg", width=290)
     st.title("MEDICHAT")
-    # Add description to the sidebar
     st.markdown("Your AI MEDICAL ASSISTANT")
 
 # Main chat interface container
@@ -120,12 +115,26 @@ if "memory" not in st.session_state:
 
 # Set up embeddings for vector search
 embedings = HuggingFaceEmbeddings(model_name="nomic-ai/nomic-embed-text-v1",model_kwargs={"trust_remote_code":True,"revision":"289f532e14dbbbd5a04753fa58739e9ba766f3c7"})
+
 # Load the FAISS vector database
-db = FAISS.load_local("./ipc_vector_db", embedings, allow_dangerous_deserialization=True)
+#db = FAISS.load_local("./ipc_vector_db_cmdt", embedings, allow_dangerous_deserialization=True)
+db = FAISS.load_local("./ipc_vector_db_med", embedings, allow_dangerous_deserialization=True)
+
 db_retriever = db.as_retriever(search_type="similarity",search_kwargs={"k": 4})
 
 # Define the prompt template for the AI
-prompt_template = """<s>[INST]You are a medical chatbot trained on the latest data in diagnosis and treatment, designed to provide accurate and concise information in response to users' medical queries. Your primary focus is to offer evidence-based answers related to symptoms, infections, disorders, diseases, and their respective treatments. Refrain from generating hypothetical diagnoses or questions, and stick strictly to the context provided. Ensure your responses are professional, concise, and relevant. If the question falls outside the given context, do not rely on chat history; instead, generate an appropriate response based on your medical knowledge. Prioritize the user's query, avoid unnecessary details, and ensure compliance with medical standards and guidelines.
+# THIS IS ACTUALLY TELLING CHATBOT WHAT U ARE AND CHAIN WHAT U HAVE TO DO
+# FOR CMDT-2023 DATA
+# prompt_template = """<s>[INST]You are a medical chatbot trained on the latest data in diagnosis and treatment, designed to provide accurate and concise information in response to users' medical queries. Your primary focus is to offer evidence-based answers related to symptoms, infections, disorders, diseases, and their respective treatments. Refrain from generating hypothetical diagnoses or questions, and stick strictly to the context provided. Ensure your responses are professional, concise, and relevant. If the question falls outside the given context, do not rely on chat history; instead, generate an appropriate response based on your medical knowledge. Prioritize the user's query, avoid unnecessary details, and ensure compliance with medical standards and guidelines.
+# CONTEXT: {context}
+# CHAT HISTORY: {chat_history}
+# QUESTION: {question}
+# ANSWER:
+# </s>[INST]
+# """
+
+## FOR MEDICAL DATA
+prompt_template = """<s>[INST]You are a medical chatbot trained on the latest data in diagnosis and treatment from HARRISON'S PRINCIPLES OF INTERNAL MEDICINE. Your primary focus is to provide accurate, evidence-based answers related to symptoms, infections, disorders, diseases, and their respective treatments, including medications, cautionary advice, and necessary evaluations. Refrain from generating hypothetical diagnoses or questions, and strictly adhere to the context provided by the user’s query. Ensure your responses are professional, concise, and aligned with established medical standards and guidelines. If the question falls outside the provided context, do not rely on chat history; instead, generate an appropriate response based on your medical knowledge. Always prioritize the user's query, avoid unnecessary details, and maintain clarity in your explanations.
 CONTEXT: {context}
 CHAT HISTORY: {chat_history}
 QUESTION: {question}
@@ -158,8 +167,7 @@ for message in st.session_state.get("messages", []):
     with st.chat_message(message.get("role")):
         st.write(message.get("content"))
 
-# Create the chat input
-input_prompt = st.chat_input("Write your Queries here.....")#input text box for user to ask question
+input_prompt = st.chat_input("WHAT CAN I ASSIST YOU FOR.....")#input text box for user to ask question
 
 # Handle user input
 if input_prompt:
@@ -178,7 +186,7 @@ if input_prompt:
 
             message_placeholder = st.empty()
 
-            full_response = "⚠️ **_Note: Information provided is accordance to current medical diagnosis & treatment 2023._** \n\n\n"
+            full_response = "⚠️ **_Note: Information provided is accordance to current medical diagnosis & treatment ._** \n\n\n"
         # Stream the response
         for chunk in result["answer"]:
             full_response+=chunk
