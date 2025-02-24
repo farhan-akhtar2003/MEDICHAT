@@ -117,7 +117,7 @@ if "memory" not in st.session_state:
 embedings = HuggingFaceEmbeddings(model_name="nomic-ai/nomic-embed-text-v1",model_kwargs={"trust_remote_code":True,"revision":"289f532e14dbbbd5a04753fa58739e9ba766f3c7"})
 
 # Load the FAISS vector database
-#db = FAISS.load_local("./ipc_vector_db_cmdt", embedings, allow_dangerous_deserialization=True)
+# db = FAISS.load_local("./ipc_vector_db_cmdt", embedings, allow_dangerous_deserialization=True)
 db = FAISS.load_local("./ipc_vector_db_med", embedings, allow_dangerous_deserialization=True)
 
 db_retriever = db.as_retriever(search_type="similarity",search_kwargs={"k": 4})
@@ -134,7 +134,23 @@ db_retriever = db.as_retriever(search_type="similarity",search_kwargs={"k": 4})
 # """
 
 ## FOR MEDICAL DATA
-prompt_template = """<s>[INST]You are a medical chatbot trained on the latest data in diagnosis and treatment from HARRISON'S PRINCIPLES OF INTERNAL MEDICINE. Your primary focus is to provide accurate, evidence-based answers related to symptoms, infections, disorders, diseases, and their respective treatments, including medications, cautionary advice, and necessary evaluations. Refrain from generating hypothetical diagnoses or questions, and strictly adhere to the context provided by the user’s query. Ensure your responses are professional, concise, and aligned with established medical standards and guidelines. If the question falls outside the provided context, do not rely on chat history; instead, generate an appropriate response based on your medical knowledge. Always prioritize the user's query, avoid unnecessary details, and maintain clarity in your explanations.
+prompt_template = """<s>[INST]You are a medical chatbot trained on the latest data in diagnosis and treatment from HARRISON'S PRINCIPLES OF INTERNAL MEDICINE and other authoritative medical sources. Your primary focus is to provide accurate, evidence-based information related to medical conditions and their management. When presented with a query about a specific disease or condition, provide comprehensive information including:
+
+1. Brief overview of the condition
+2. Common symptoms and signs
+3. Diagnostic procedures and tests
+4. Treatment options:
+   a. Medications (including dosages and potential side effects)
+   b. Surgical interventions (if applicable)
+   c. Other therapeutic approaches
+5. Lifestyle modifications and self-care measures
+6. Dietary recommendations and restrictions
+7. Prognosis and long-term management
+8. Potential complications and how to prevent them
+9. When to seek immediate medical attention
+
+Ensure your responses are professional, concise, and aligned with established medical standards and guidelines. Prioritize the user's specific query while providing a well-rounded answer. If the question falls outside your knowledge base or requires personalized medical advice, recommend consulting a healthcare professional.
+
 CONTEXT: {context}
 CHAT HISTORY: {chat_history}
 QUESTION: {question}
@@ -151,7 +167,7 @@ llm = Together(
     model="mistralai/Mistral-7B-Instruct-v0.2",
     temperature=0.5,
     max_tokens=1024,
-    together_api_key="63796cfbe489810e7341f4622447cf023df92e6c6f9d665777f374032ba50474"
+    together_api_key="3057a359ca444b31fd81b6a0958283873ebce147defd0d827d45330e98a536a6"
 )
 
 # Create the conversational retrieval chain
