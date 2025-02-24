@@ -61,3 +61,5 @@ Create a `.env` file and add the following environment variables:
 LANGCHAIN_API_KEY=YOUR_API_KEY
 LANGCHAIN_PROJECT=YOUR_PROJECT_NAME
 TOGETHER_API_KEY=YOUR_API_KEY
+
+# FARHAN AKHTAR
