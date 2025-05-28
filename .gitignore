@@ -1,5 +1,26 @@
-# Ignore virtual environment directory
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual Environment
 venv/
 
-# Ignore environment configuration file
+# Environment Variables
 .env
+
+# macOS system files
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings (optional)
+.vscode/
+
+# Model & Log files (if applicable)
+*.h5
+*.pkl
+*.pt
+*.sav
+*.log
