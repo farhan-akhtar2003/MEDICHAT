@@ -1,19 +1,19 @@
-==> 2024-08-24 02:17:33 <==
-# cmd: /opt/homebrew/anaconda3/bin/conda create -p venv python=3.10
-# conda version: 24.5.0
-+defaults/noarch::tzdata-2024a-h04d1e81_0
-+defaults/osx-arm64::bzip2-1.0.8-h80987f9_6
-+defaults/osx-arm64::ca-certificates-2024.7.2-hca03da5_0
-+defaults/osx-arm64::libffi-3.4.4-hca03da5_1
-+defaults/osx-arm64::ncurses-6.4-h313beb8_0
-+defaults/osx-arm64::openssl-3.0.14-h80987f9_0
-+defaults/osx-arm64::pip-24.2-py310hca03da5_0
-+defaults/osx-arm64::python-3.10.14-hb885b13_1
-+defaults/osx-arm64::readline-8.2-h1a28f6b_0
-+defaults/osx-arm64::setuptools-72.1.0-py310hca03da5_0
-+defaults/osx-arm64::sqlite-3.45.3-h80987f9_0
-+defaults/osx-arm64::tk-8.6.14-h6ba3021_0
-+defaults/osx-arm64::wheel-0.43.0-py310hca03da5_0
-+defaults/osx-arm64::xz-5.4.6-h80987f9_1
-+defaults/osx-arm64::zlib-1.2.13-h18a0788_1
+==> 2025-05-22 17:07:10 <==
+# cmd: C:\Users\unnat\anaconda3\Scripts\conda-script.py create -p venv python=3.10
+# conda version: 23.1.0
++defaults/noarch::pip-25.1-pyhc872135_2
++defaults/noarch::tzdata-2025b-h04d1e81_0
++defaults/win-64::bzip2-1.0.8-h2bbff1b_6
++defaults/win-64::ca-certificates-2025.2.25-haa95532_0
++defaults/win-64::libffi-3.4.4-hd77b12b_1
++defaults/win-64::openssl-3.0.16-h3f729d1_0
++defaults/win-64::python-3.10.16-h4607a30_1
++defaults/win-64::setuptools-78.1.1-py310haa95532_0
++defaults/win-64::sqlite-3.45.3-h2bbff1b_0
++defaults/win-64::tk-8.6.14-h0416ee5_0
++defaults/win-64::vc-14.42-haa95532_5
++defaults/win-64::vs2015_runtime-14.42.34433-hbfb602d_5
++defaults/win-64::wheel-0.45.1-py310haa95532_0
++defaults/win-64::xz-5.6.4-h4754444_1
++defaults/win-64::zlib-1.2.13-h8cc25b3_1
 # update specs: ['python=3.10']
