@@ -112,6 +112,9 @@ def reset_conversation():
     st.session_state.last_detailed_query_context = None
     st.session_state.display_tell_more_button = False
     st.session_state.tell_more_button_clicked = False
+    st.session_state['tell_more_state'] = {}
+    st.session_state['detailed_query_contexts'] = []
+    st.session_state['detailed_responses'] = {}
 
 # Session State Variables
 if "messages" not in st.session_state:
@@ -146,7 +149,8 @@ BRIEF ANSWER:
 </s>[INST]
 """
 
-DETAILED_PROMPT_TEMPLATE = """<s>[INST]You are a medical chatbot trained on the latest data from HARRISON'S PRINCIPLES OF INTERNAL MEDICINE. Provide comprehensive information including:
+DETAILED_PROMPT_TEMPLATE = """<s>[INST]You are a medical chatbot trained on the latest data from HARRISON'S PRINCIPLES OF INTERNAL MEDICINE. For each section below, use bullet points or numbered lists to present information clearly and concisely.
+
 1. Brief overview of the condition
 2. Common symptoms and signs
 3. Diagnostic procedures and tests
@@ -202,41 +206,164 @@ def stream_text_with_typing_effect(message_placeholder, text_to_stream):
         message_placeholder.markdown(text_to_stream[:i+1] + " ▌")
     message_placeholder.markdown(text_to_stream)
 
-# Display previous messages
+# --- Per-message 'Tell me more' state and context ---
+if 'tell_more_state' not in st.session_state:
+    st.session_state['tell_more_state'] = {}
+if 'detailed_query_contexts' not in st.session_state:
+    st.session_state['detailed_query_contexts'] = []
+if 'detailed_responses' not in st.session_state:
+    st.session_state['detailed_responses'] = {}
+
+# Display previous messages (only brief answers and user messages)
+brief_message_count = 0  # Track the index of brief assistant messages
 for i, message in enumerate(st.session_state.get("messages", [])):
+    if message.get("role") == "assistant" and message.get("type") == "detailed":
+        continue
     with st.chat_message(message.get("role")):
         st.write(message.get("content"))
-        if message.get("role") == "assistant" and \
-           message.get("type") == "brief" and \
-           st.session_state.display_tell_more_button and \
-           i == len(st.session_state.messages) - 1:
-            if st.button("Tell me more...", key=f"tell_me_more_{i}"):
-                st.session_state.tell_more_button_clicked = True
-                st.session_state.display_tell_more_button = False
-                st.rerun()
+        if message.get("role") == "assistant" and message.get("type") == "brief":
+            # Only allow 'Tell me more' if context exists for this brief message
+            if brief_message_count < len(st.session_state['detailed_query_contexts']):
+                if not st.session_state['tell_more_state'].get(brief_message_count, False):
+                    if st.button("Tell me more...", key=f"tell_me_more_{brief_message_count}"):
+                        st.session_state['tell_more_state'][brief_message_count] = True
+                        st.rerun()
+                elif st.session_state['tell_more_state'].get(brief_message_count, False):
+                    # Check if we already have the detailed response stored
+                    if brief_message_count in st.session_state['detailed_responses']:
+                        # Display the stored detailed response
+                        stored_response = st.session_state['detailed_responses'][brief_message_count]
+                        st.markdown("⚠️ **_Note: Information provided is accordance to current medical diagnosis & treatment ._** ")
+                        for title, section_content in stored_response['sections']:
+                            with st.expander(title):
+                                st.markdown(section_content)
+                        if stored_response['recommended_professional']:
+                            st.markdown(f"<div style='border:2px solid #ff6262; border-radius:10px; padding:16px; background:#fff0f0; margin-top:16px; margin-bottom:8px;'><b>Recommended Professional/Facility:</b> {stored_response['recommended_professional']}</div>", unsafe_allow_html=True)
+                            if stored_response['resource_buttons']:
+                                st.markdown("<div style='margin-top:12px; margin-bottom:8px;'><b>Find Nearby Services:</b></div>", unsafe_allow_html=True)
+                                cols = st.columns(len(stored_response['resource_buttons']))
+                                for j, (label, gmap_query) in enumerate(stored_response['resource_buttons']):
+                                    gmap_url = f"https://www.google.com/maps/search/?api=1&query={gmap_query}"
+                                    with cols[j]:
+                                        st.markdown(f"""
+                                            <a href='{gmap_url}' target='_blank' style='display:inline-block; margin:6px 0; color:#fff; background:linear-gradient(90deg,#ff6262,#ffd0d0); padding:12px 18px; border-radius:12px; text-decoration:none; font-weight:bold; font-size:1em; box-shadow:0 2px 8px #ffd0d0;'>
+                                                {label}
+                                            </a>
+                                        """, unsafe_allow_html=True)
+                    else:
+                        # Generate and store new detailed response
+                        detailed_input = st.session_state['detailed_query_contexts'][brief_message_count]
+                        detailed_chain = ConversationalRetrievalChain.from_llm(
+                            llm=llm,
+                            memory=st.session_state.memory,
+                            retriever=db_retriever,
+                            combine_docs_chain_kwargs={'prompt': detailed_prompt}
+                        )
+                        result = detailed_chain.invoke(input=detailed_input["question"])
+                        detailed_answer_raw = result["answer"]
+                        # --- Improved section splitting and display ---
+                        section_pattern = r"(\d+\. [^\n]+)"  # Matches section headers
+                        matches = list(re.finditer(section_pattern, detailed_answer_raw))
+                        sections = []
+                        for idx2, match2 in enumerate(matches):
+                            start = match2.start()
+                            end = matches[idx2+1].start() if idx2+1 < len(matches) else None
+                            section_text = detailed_answer_raw[start:end].strip()
+                            lines = section_text.split('\n')
+                            header = match2.group(0).strip()
+                            if len(lines) > 1 and lines[1].strip().lower().startswith(header.split('.',1)[1].strip().lower()):
+                                lines = [lines[0]] + lines[2:]
+                            content_lines = [l for l in lines[1:] if l.strip()]
+                            if content_lines:
+                                sections.append((header, '\n'.join(content_lines)))
+                        clarified_section_titles = [
+                            "Overview",
+                            "Common Symptoms & Signs",
+                            "Diagnostic Procedures & Tests",
+                            "Treatment Options",
+                            "Lifestyle & Self-Care",
+                            "Dietary Advice",
+                            "Prognosis & Long-Term Management",
+                            "Potential Complications & Prevention",
+                            "When to Seek Emergency Care"
+                        ]
+                        
+                        # Process sections for display and storage
+                        processed_sections = []
+                        for idx2, (header, section_content) in enumerate(sections):
+                            lines = section_content.split('\n')
+                            if sum(1 for l in lines if l.strip().startswith(('-', '*', '•', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.'))) > 1:
+                                formatted = '\n'.join([('- ' + l.lstrip('•- ')) if l.strip().startswith(('•', '-', '*')) else l for l in lines])
+                                section_content = formatted
+                            title = clarified_section_titles[idx2] if idx2 < len(clarified_section_titles) else header
+                            processed_sections.append((title, section_content))
+                        
+                        # Extract recommended professional
+                        recommended_professional = None
+                        match = re.search(r"Recommended Professional/Facility:\s*(.*)", detailed_answer_raw, re.IGNORECASE)
+                        if match:
+                            recommended_professional = match.group(1).strip()
+                        else:
+                            # fallback: try to extract from last section
+                            last_section = sections[-1][1] if sections else detailed_answer_raw
+                            match2 = re.search(r"(physician|doctor|hospital|clinic|specialist|emergency|medical professional)", last_section, re.IGNORECASE)
+                            if match2:
+                                recommended_professional = match2.group(0).title()
+                        
+                        # Generate resource buttons
+                        resource_buttons = []
+                        if recommended_professional:
+                            recs = re.split(r",| or | and ", recommended_professional)
+                            filtered_recs = [rec.strip() for rec in recs if rec.strip() and len(rec.strip().split()) <= 5 and not any(x in rec.lower() for x in ["depending", "contact", "develop", "symptom", "seek", "provider", "action", "severity"])]
+                            resource_buttons = [(rec, f"{rec.replace(' ', '+')}+near+me") for rec in filtered_recs]
+                        
+                        # Store the detailed response for future use
+                        st.session_state['detailed_responses'][brief_message_count] = {
+                            'sections': processed_sections,
+                            'recommended_professional': recommended_professional,
+                            'resource_buttons': resource_buttons
+                        }
+                        
+                        # Display the response
+                        st.markdown("⚠️ **_Note: Information provided is accordance to current medical diagnosis & treatment ._** ")
+                        for title, section_content in processed_sections:
+                            with st.expander(title):
+                                st.markdown(section_content)
+                        
+                        if recommended_professional:
+                            st.markdown(f"<div style='border:2px solid #ff6262; border-radius:10px; padding:16px; background:#fff0f0; margin-top:16px; margin-bottom:8px;'><b>Recommended Professional/Facility:</b> {recommended_professional}</div>", unsafe_allow_html=True)
+                            if resource_buttons:
+                                st.markdown("<div style='margin-top:12px; margin-bottom:8px;'><b>Find Nearby Services:</b></div>", unsafe_allow_html=True)
+                                cols = st.columns(len(resource_buttons))
+                                for j, (label, gmap_query) in enumerate(resource_buttons):
+                                    gmap_url = f"https://www.google.com/maps/search/?api=1&query={gmap_query}"
+                                    with cols[j]:
+                                        st.markdown(f"""
+                                            <a href='{gmap_url}' target='_blank' style='display:inline-block; margin:6px 0; color:#fff; background:linear-gradient(90deg,#ff6262,#ffd0d0); padding:12px 18px; border-radius:12px; text-decoration:none; font-weight:bold; font-size:1em; box-shadow:0 2px 8px #ffd0d0;'>
+                                                {label}
+                                            </a>
+                                        """, unsafe_allow_html=True)
+            brief_message_count += 1  # Increment counter for each brief assistant message
 
 user_input = st.chat_input("WHAT CAN I ASSIST YOU FOR.....", key="chat_input")
 
-
-# Handling new user input and brief response
-if user_input and user_input != st.session_state.last_user_query and not st.session_state.tell_more_button_clicked:
-    st.session_state.last_user_query = user_input 
+# --- FIX: Always reset state and enforce correct flow on new query ---
+if user_input and user_input != st.session_state.last_user_query:
+    st.session_state.last_user_query = user_input
     st.session_state.show_detailed_response = False
     st.session_state.display_tell_more_button = False
-
-    with st.chat_message("user"):
-        st.write(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
-
+    st.session_state.tell_more_button_clicked = False
+    # Add new context for this query
     docs = db_retriever.get_relevant_documents(user_input)
     context_str = "\n\n".join([doc.page_content for doc in docs])
-
-    st.session_state.last_detailed_query_context = {
+    detailed_context = {
         "context": context_str,
         "chat_history": st.session_state.memory.load_memory_variables({})["chat_history"],
         "question": user_input
     }
-
+    with st.chat_message("user"):
+        st.write(user_input)
+    st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("assistant"):
         with st.status("Introspecting 💡...", expanded=True):
             brief_chain = ConversationalRetrievalChain.from_llm(
@@ -246,60 +373,9 @@ if user_input and user_input != st.session_state.last_user_query and not st.sess
                 combine_docs_chain_kwargs={'prompt': brief_prompt}
             )
             brief_answer = generate_and_stream_response(brief_chain, user_input, st.empty())
-            
             st.session_state.messages.append({"role": "assistant", "content": brief_answer, "type": "brief", "original_query": user_input})
-
-        st.session_state.display_tell_more_button = True
-        st.session_state.tell_more_button_clicked = False
-        st.rerun()
-
-# Handling detailed response
-if st.session_state.tell_more_button_clicked and st.session_state.last_detailed_query_context is not None:
-    st.session_state.show_detailed_response = True
-    st.session_state.tell_more_button_clicked = False
-
-    detailed_input = st.session_state.last_detailed_query_context
-
-    with st.chat_message("assistant"):
-        
-        with st.status("Fetching more details...", expanded=True):
-            message_placeholder = st.empty()
-
-            detailed_chain = ConversationalRetrievalChain.from_llm(
-                llm=llm,
-                memory=st.session_state.memory,
-                retriever=db_retriever,
-                combine_docs_chain_kwargs={'prompt': detailed_prompt}
-            )
-
-            result = detailed_chain.invoke(input=detailed_input["question"])
-            detailed_answer_raw = result["answer"]
-
-            recommended_professional = None
-            match = re.search(r"Recommended Professional/Facility:\s*(.*)", detailed_answer_raw, re.IGNORECASE)
-            if match:
-                recommended_professional = match.group(1).strip()
-            else:
-                if "general physician" in detailed_answer_raw.lower() or "doctor" in detailed_answer_raw.lower():
-                    recommended_professional = "General Physician"
-                elif "hospital" in detailed_answer_raw.lower() or "clinic" in detailed_answer_raw.lower() or "emergency" in detailed_answer_raw.lower():
-                    recommended_professional = "Hospital"
-                if not recommended_professional:
-                    recommended_professional = "Medical Professional"
-
-            final_detailed_message_content = "⚠️ **_Note: Information provided is accordance to current medical diagnosis & treatment ._** \n\n\n" + detailed_answer_raw
-
-            if recommended_professional:
-                search_term = recommended_professional.replace(" ", "+") + "+near+me"
-                Maps_url = f"https://www.google.com/maps/search/?api=1&query={search_term}"
-                final_detailed_message_content += f"\n\n**Find a {recommended_professional} near you:** [Search on Google Maps]({Maps_url})"
-
-            stream_text_with_typing_effect(message_placeholder, final_detailed_message_content)
-        
-        st.session_state.messages.append({"role": "assistant", "content": final_detailed_message_content, "type": "detailed"})
-
-    st.session_state.last_detailed_query_context = None
-    st.session_state.show_detailed_response = False
+            st.session_state['detailed_query_contexts'].append(detailed_context)
+    st.rerun()
 
 if st.session_state.get("messages"):
     st.button('Reset All Chat 🗑️', on_click=reset_conversation, key="reset_chat_button_global")
