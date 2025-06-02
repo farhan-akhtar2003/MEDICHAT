@@ -250,6 +250,11 @@ for i, message in enumerate(st.session_state.get("messages", [])):
                                                 {label}
                                             </a>
                                         """, unsafe_allow_html=True)
+                                st.markdown(f"""
+                                    <a href='https://snapwell.onrender.com/' target='_blank' style='display:inline-block; margin:6px 0; color:#fff; background:linear-gradient(90deg,#ff6262,#ffd0d0); padding:12px 18px; border-radius:12px; text-decoration:none; font-weight:bold; font-size:1em; box-shadow:0 2px 8px #ffd0d0;'>
+                                        Book Appointment
+                                    </a>
+                                """, unsafe_allow_html=True)
                     else:
                         # Generate and store new detailed response
                         detailed_input = st.session_state['detailed_query_contexts'][brief_message_count]
